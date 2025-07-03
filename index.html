@@ -1,1 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMILO Multijugador Online</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: #333; 
+            text-align: center; 
+            padding: 20px; 
+            min-height: 100vh;
+        }
+        h1 { 
+            color: #ff4757; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        .game-container { 
+            max-width: 800px; 
+            margin: 0 auto;
+            background-color: rgba(255,255,255,0.9);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .cards-row { 
+            display: flex; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            margin: 20px 0; 
+        }
+        .card { 
+            width: 120px; 
+            height: 180px; 
+            background: linear-gradient(45deg, #48dbfb, #0abde3);
+            border-radius: 15px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 16px; 
+            text-align: center; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            transition: all 0.3s ease;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .card:hover { 
+            transform: scale(1.05); 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .card.selected { 
+            background: linear-gradient(45deg, #feca57, #ff9f43);
+            color: #333; 
+            border: 3px solid #ff9f43; 
+        }
+        .card.eliminated { 
+            opacity: 0.5; 
+            filter: grayscale(100%); 
+            pointer-events: none; 
+        }
+        .card.leader { 
+            background: linear-gradient(45deg, #1dd1a1, #10ac84);
+        }
+        .controls { 
+            margin: 20px 0; 
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ff4757);
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(255,71,87,0.3);
+            font-weight: bold;
+            min-width: 200px;
+        }
+        button:hover { 
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(255,71,87,0.4);
+        }
+        button.secondary {
+            background: linear-gradient(45deg, #54a0ff, #2e86de);
+            box-shadow: 0 4px 8px rgba(46,134,222,0.3);
+        }
+        button.secondary:hover {
+            box-shadow: 0 6px 12px rgba(46,134,222,0.4);
+        }
+        .room-info { 
+            background-color: rgba(255,255,255,0.7); 
+            padding: 20px; 
+            border-radius: 15px; 
+            margin: 20px 0; 
+            border: 2px dashed #ff4757;
+        }
+        #players-list { 
+            display: flex; 
+            justify-content: center; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+            margin-top: 15px;
+        }
+        .player { 
+            background: linear-gradient(45deg, #5f27cd, #341f97);
+            color: white;
+            padding: 8px 15px; 
+            border-radius: 50px; 
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .current-turn { 
+            border: 2px solid #feca57;
+            box-shadow: 0 0 15px #feca57;
+        }
+        h2, h3 { 
+            margin: 15px 0; 
+            color: #2f3542;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        #qrcode {
+            margin: 20px auto;
+            padding: 10px;
+            background: white;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        .close-modal {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .share-buttons {
+            margin-top: 20px;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+    </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
+        const firebaseConfig = {
+            apiKey: "AIzaSyBXYtn4p2YYS50vWfCE9wTNohiI_wwfwEQ",
+            authDomain: "cazus-similo.firebaseapp.com",
+            databaseURL: "https://cazus-similo-default-rtdb.firebaseio.com",
+            projectId: "cazus-similo",
+            storageBucket: "cazus-similo.appspot.com",
+            messagingSenderId: "846461046167",
+            appId: "1:846461046167:web:3cd08d21ace25ca789c8d2",
+            measurementId: "G-LD3YFY0S5W"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        window.firebaseDatabase = database;
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseOnValue = onValue;
+        window.firebaseUpdate = update;
+    </script>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎴 SIMILO Multijugador</h1>
+        
+        <div class="room-info">
+            <p>Sala: <strong id="room-id">Cargando...</strong></p>
+            <p>Jugadores conectados:</p>
+            <div id="players-list"></div>
+        </div>
+        
+        <div class="controls">
+            <button id="start-btn">Nuevo Juego</button>
+            <button id="reveal-btn">Mostrar Personaje Oculto (3s)</button>
+            <button id="share-btn" class="secondary">Compartir Partida</button>
+        </div>
+        
+        <h2>Cartas en Juego:</h2>
+        <div class="cards-row" id="game-cards"></div>
+        
+        <h2>Personaje Oculto: <span id="hidden-card">?</span></h2>
+        <h3>Personaje Líder: <span id="leader-card">?</span></h3>
+    </div>
+
+    <!-- Modal QR -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <h2>Unirse a la partida</h2>
+            <p>Escanea este código QR con otro dispositivo:</p>
+            <div id="qrcode"></div>
+            <p>O comparte este enlace:</p>
+            <input type="text" id="roomUrl" readonly>
+            <div class="share-buttons">
+                <button onclick="copyUrl()">Copiar Enlace</button>
+                <button onclick="shareNative()">Compartir</button>
+            </div>
+            <button class="close-modal" onclick="closeModal()">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        // Lista COMPLETA de 100 palabras personalizadas
+        const allWords = [
+            "Mario", "David", "Rodrigo", "Alfonso", "Miguel", "Anta", "Voley", "Marmi", "Ping pong", "Leoncio",
+            "Smash", "Ganondorf", "Yoshi", "Random", "Greninja", "Canela😻", "Ridley", "Dublín", "Italia", "Francia",
+            "Salou", "En 4 🤑", "Central", "Líbero", "Colocador", "Opuesto", "Campus RFVB 2023", "Campus RFVB 2024",
+            "Esgrima", "José Luis", "Cristóbal", "Geniuscani", "Minecraft", "Pa ti la cosa", "Smash Ball Ultimate",
+            "CEIP los Adiles", "IES Ordoño II", "Fortnite", "Novia", "Música", "Chorizo asesino", "Kevin", "Ohio",
+            "Mocarro", "Si quieres, no puedes", "Jose Mourinho", "Kiwi 🥝", "Viejas tomando sopa", "Alimerka", "Ajedrez",
+            "Cuanta copa tene", "Alcohol", "Electrototototecno", "Cámara de fotos", "Baloncesto", "Anime", "SoundCloud",
+            "Spotify", "Football", "Mendigo", "Looksmaxing", "English", "Calculadora", "Madrid", "Calistenia", "Entrenar",
+            "Discoteca", "Obsesión", "Leer", "Pilla pilla", "Zombie", "Villaobispo", "Villarrodrigo", "Villanegro",
+            "Limpio", "Team Carballo", "Youtuber/Tiktoker", "Saltar la zanja", "Celada", "Fuck Isis", "Hate Ponfe",
+            "Islamierdon", "La Historia", "La Blibia", "Billar", "Discord", "Monopoly", "Estoicismo", "Microbit",
+            "Qué estoy diciendo...!!!", "Cómo es posible este suceso", "La gravedad no existe", "Correa", "Veo negro",
+            "Rodrigo pena", "Carpa de Rodrigo", "Interrumpir al hablar", "No pronunciar", "Videollamadas Teams", "Cazus"
+        ];
+
+        // Variables del juego
+        let gameState = {
+            cards: [],
+            hiddenCard: "",
+            leaderCard: "",
+            selectedCards: [],
+            currentTurn: 0
+        };
+        let currentRoom = "";
+        let playerId = Math.random().toString(36).substring(2, 10);
+        let players = {};
+        let playerName = `Jugador ${Math.floor(Math.random() * 100)}`;
+
+        // Elementos del DOM
+        const gameCardsContainer = document.getElementById("game-cards");
+        const hiddenCardElement = document.getElementById("hidden-card");
+        const leaderCardElement = document.getElementById("leader-card");
+        const startBtn = document.getElementById("start-btn");
+        const revealBtn = document.getElementById("reveal-btn");
+        const shareBtn = document.getElementById("share-btn");
+        const roomIdElement = document.getElementById("room-id");
+        const playersListElement = document.getElementById("players-list");
+        const qrModal = document.getElementById("qrModal");
+        const qrcodeDiv = document.getElementById("qrcode");
+        const roomUrlInput = document.getElementById("roomUrl");
+
+        // Acceso a Firebase
+        const { firebaseDatabase, firebaseRef, firebaseSet, firebaseOnValue, firebaseUpdate } = window;
+
+        // Función para unirse a sala (mejorada)
+        function joinRoom() {
+            const urlParams = new URLSearchParams(window.location.search);
+            currentRoom = urlParams.get('room');
+            
+            // Si no hay sala, crea una nueva y redirige
+            if (!currentRoom) {
+                currentRoom = "room-" + Math.random().toString(36).substring(2, 6);
+                window.history.replaceState({}, '', `?room=${currentRoom}`);
+                console.log("Nueva sala creada:", currentRoom);
+            }
+
+            roomIdElement.textContent = currentRoom;
+            playerName = prompt("¡Bienvenido a SIMILO!\nIngresa tu nombre:", playerName) || playerName;
+
+            // Registrar jugador en Firebase
+            const playerRef = firebaseRef(firebaseDatabase, `rooms/${currentRoom}/players/${playerId}`);
+            firebaseSet(playerRef, {
+                name: playerName,
+                joinedAt: new Date().toISOString()
+            });
+
+            // Sincronizar jugadores
+            const playersRef = firebaseRef(firebaseDatabase, `rooms/${currentRoom}/players`);
+            firebaseOnValue(playersRef, (snapshot) => {
+                players = snapshot.val() || {};
+                updatePlayersList();
+            });
+
+            // Sincronizar estado del juego
+            const gameRef = firebaseRef(firebaseDatabase, `rooms/${currentRoom}/game`);
+            firebaseOnValue(gameRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    gameState = {
+                        cards: data.cards || [],
+                        hiddenCard: data.hiddenCard || "",
+                        leaderCard: data.leaderCard || "",
+                        selectedCards: data.selectedCards || [],
+                        currentTurn: data.currentTurn || 0
+                    };
+                    updateGameUI();
+                    console.log("Datos sincronizados:", gameState);
+                }
+            });
+
+            // Solo mostrar alerta al creador de la sala
+            if (!urlParams.get('room')) {
+                setTimeout(() => {
+                    alert(`¡Sala creada!\nComparte este enlace:\n${window.location.href}`);
+                }, 1000);
+            }
+        }
+
+        // Función para iniciar nuevo juego
+        function startGame() {
+            const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+            gameState = {
+                cards: shuffled.slice(0, 12),
+                hiddenCard: "",
+                leaderCard: "",
+                selectedCards: [],
+                currentTurn: 0
+            };
+            
+            gameState.hiddenCard = gameState.cards[Math.floor(Math.random() * gameState.cards.length)];
+            
+            do {
+                gameState.leaderCard = gameState.cards[Math.floor(Math.random() * gameState.cards.length)];
+            } while (gameState.leaderCard === gameState.hiddenCard);
+            
+            updateFirebaseGameState();
+        }
+
+        // Actualizar Firebase con el estado del juego
+        function updateFirebaseGameState() {
+            const gameRef = firebaseRef(firebaseDatabase, `rooms/${currentRoom}/game`);
+            firebaseSet(gameRef, gameState);
+        }
+
+        // Función para seleccionar carta
+        function selectCard(word) {
+            if (word === gameState.leaderCard || gameState.selectedCards.includes(word)) return;
+            
+            // Verificar turno
+            const playerIds = Object.keys(players);
+            if (playerIds.length === 0 || playerIds[gameState.currentTurn % playerIds.length] !== playerId) {
+                alert("¡No es tu turno!");
+                return;
+            }
+            
+            gameState.selectedCards.push(word);
+            gameState.currentTurn++;
+            updateFirebaseGameState();
+
+            // Verificar fin del juego
+            if (word === gameState.hiddenCard) {
+                setTimeout(() => {
+                    alert(`¡Correcto! El personaje oculto era: ${gameState.hiddenCard}`);
+                    startGame();
+                }, 500);
+            } else if (gameState.selectedCards.length >= 4) {
+                setTimeout(() => {
+                    alert(`¡Perdiste! El personaje oculto era: ${gameState.hiddenCard}`);
+                    startGame();
+                }, 500);
+            }
+        }
+
+        // Actualizar interfaz de usuario
+        function updateGameUI() {
+            gameCardsContainer.innerHTML = "";
+            
+            gameState.cards.forEach(word => {
+                const card = document.createElement("div");
+                card.className = "card";
+                if (word === gameState.leaderCard) card.classList.add("leader");
+                if (gameState.selectedCards.includes(word)) card.classList.add("eliminated");
+                card.textContent = word;
+                
+                if (!gameState.selectedCards.includes(word) && word !== gameState.leaderCard) {
+                    card.addEventListener("click", () => selectCard(word));
+                }
+                
+                gameCardsContainer.appendChild(card);
+            });
+            
+            hiddenCardElement.textContent = gameState.hiddenCard ? "?" : "";
+            leaderCardElement.textContent = gameState.leaderCard || "?";
+            updatePlayersList();
+        }
+
+        // Actualizar lista de jugadores
+        function updatePlayersList() {
+            playersListElement.innerHTML = "";
+            const playerIds = Object.keys(players);
+            
+            playerIds.forEach((id, index) => {
+                const playerElement = document.createElement("div");
+                playerElement.className = `player ${index === gameState.currentTurn % playerIds.length ? 'current-turn' : ''}`;
+                playerElement.textContent = `${players[id].name}${id === playerId ? " (Tú)" : ""}`;
+                playersListElement.appendChild(playerElement);
+            });
+        }
+
+        // Funciones para el QR y compartir
+        function showQRModal() {
+            const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
+            roomUrlInput.value = shareUrl;
+            
+            // Generar QR
+            const qr = qrcode(0, 'L');
+            qr.addData(shareUrl);
+            qr.make();
+            qrcodeDiv.innerHTML = qr.createImgTag(4);
+            
+            qrModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            qrModal.style.display = 'none';
+        }
+
+        function copyUrl() {
+            roomUrlInput.select();
+            document.execCommand('copy');
+            alert("¡Enlace copiado al portapapeles!");
+        }
+
+        function shareNative() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Únete a mi partida de SIMILO',
+                    text: 'Juega Similo Multijugador conmigo',
+                    url: roomUrlInput.value
+                }).catch(err => {
+                    console.log('Error al compartir:', err);
+                });
+            } else {
+                copyUrl();
+            }
+        }
+
+        // Inicialización al cargar la página
+        document.addEventListener("DOMContentLoaded", () => {
+            joinRoom();
+            
+            // Event listeners
+            startBtn.addEventListener("click", startGame);
+            revealBtn.addEventListener("click", () => {
+                hiddenCardElement.textContent = gameState.hiddenCard;
+                setTimeout(() => {
+                    hiddenCardElement.textContent = "?";
+                }, 3000);
+            });
+            shareBtn.addEventListener("click", showQRModal);
+            
+            // Cerrar modal al hacer clic fuera
+            window.addEventListener('click', (e) => {
+                if (e.target === qrModal) {
+                    closeModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
