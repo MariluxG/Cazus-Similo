@@ -271,6 +271,7 @@
         let currentRoom = "";
         let playerId = Math.random().toString(36).substring(2, 10);
         let players = {};
+        let turnOrder = [];
         let playerName = `Jugador ${Math.floor(Math.random() * 100)}`;
 
         // Elementos del DOM
@@ -289,17 +290,24 @@
         // Acceso a Firebase
         const { firebaseDatabase, firebaseRef, firebaseSet, firebaseOnValue, firebaseUpdate } = window;
 
-        // Función para unirse a sala (mejorada)
+        // Función MEJORADA para unirse/crear sala
         function joinRoom() {
             const urlParams = new URLSearchParams(window.location.search);
             currentRoom = urlParams.get('room');
             
+            // --- CORRECCIÓN CLAVE --- //
             // Si no hay sala, crea una nueva y redirige
             if (!currentRoom) {
                 currentRoom = "room-" + Math.random().toString(36).substring(2, 6);
                 window.history.replaceState({}, '', `?room=${currentRoom}`);
                 console.log("Nueva sala creada:", currentRoom);
+                
+                // Alerta solo al creador
+                setTimeout(() => {
+                    alert(`¡Sala creada!\nComparte este enlace:\n${window.location.href}`);
+                }, 500);
             }
+            // --- FIN CORRECCIÓN --- //
 
             roomIdElement.textContent = currentRoom;
             playerName = prompt("¡Bienvenido a SIMILO!\nIngresa tu nombre:", playerName) || playerName;
@@ -315,6 +323,7 @@
             const playersRef = firebaseRef(firebaseDatabase, `rooms/${currentRoom}/players`);
             firebaseOnValue(playersRef, (snapshot) => {
                 players = snapshot.val() || {};
+                turnOrder = Object.keys(players).sort();
                 updatePlayersList();
             });
 
@@ -334,13 +343,6 @@
                     console.log("Datos sincronizados:", gameState);
                 }
             });
-
-            // Solo mostrar alerta al creador de la sala
-            if (!urlParams.get('room')) {
-                setTimeout(() => {
-                    alert(`¡Sala creada!\nComparte este enlace:\n${window.location.href}`);
-                }, 1000);
-            }
         }
 
         // Función para iniciar nuevo juego
